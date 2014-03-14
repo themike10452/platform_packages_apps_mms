@@ -31,7 +31,6 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Vibrator;
-import android.preference.CheckBoxPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.PreferenceActivity;
@@ -39,6 +38,7 @@ import android.preference.PreferenceCategory;
 import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
 import android.preference.RingtonePreference;
+import android.preference.SwitchPreference;
 import android.provider.SearchRecentSuggestions;
 import android.text.TextUtils;
 import android.view.Menu;
@@ -74,6 +74,9 @@ public class MessagingPreferenceActivity extends PreferenceActivity
     public static final String AUTO_DELETE              = "pref_key_auto_delete";
     public static final String GROUP_MMS_MODE           = "pref_key_mms_group_mms";
 
+    // Smart Dialer
+    public static final String SMART_DIALER_ENABLED = "pref_key_mms_smart_dialer";
+
     // Menu entries
     private static final int MENU_RESTORE_DEFAULTS    = 1;
 
@@ -94,9 +97,10 @@ public class MessagingPreferenceActivity extends PreferenceActivity
     private Preference mMmsReadReportPref;
     private Preference mManageSimPref;
     private Preference mClearHistoryPref;
-    private CheckBoxPreference mVibratePref;
-    private CheckBoxPreference mEnableNotificationsPref;
-    private CheckBoxPreference mMmsAutoRetrievialPref;
+    private SwitchPreference mVibratePref;
+    private SwitchPreference mEnableNotificationsPref;
+    private SwitchPreference mMmsAutoRetrievialPref;
+    private SwitchPreference mSmartCall;
     private RingtonePreference mRingtonePref;
     private Recycler mSmsRecycler;
     private Recycler mMmsRecycler;
@@ -165,6 +169,7 @@ public class MessagingPreferenceActivity extends PreferenceActivity
         mSmsPrefCategory.setEnabled(mIsSmsEnabled);
         mMmsPrefCategory.setEnabled(mIsSmsEnabled);
         mNotificationPrefCategory.setEnabled(mIsSmsEnabled);
+        mSmartCall.setEnabled(mIsSmsEnabled);
     }
 
     @Override
@@ -193,9 +198,10 @@ public class MessagingPreferenceActivity extends PreferenceActivity
         mMmsReadReportPref = findPreference("pref_key_mms_read_reports");
         mMmsLimitPref = findPreference("pref_key_mms_delete_limit");
         mClearHistoryPref = findPreference("pref_key_mms_clear_history");
-        mEnableNotificationsPref = (CheckBoxPreference) findPreference(NOTIFICATION_ENABLED);
-        mMmsAutoRetrievialPref = (CheckBoxPreference) findPreference(AUTO_RETRIEVAL);
-        mVibratePref = (CheckBoxPreference) findPreference(NOTIFICATION_VIBRATE);
+        mEnableNotificationsPref = (SwitchPreference) findPreference(NOTIFICATION_ENABLED);
+        mMmsAutoRetrievialPref = (SwitchPreference) findPreference(AUTO_RETRIEVAL);
+        mVibratePref = (SwitchPreference) findPreference(NOTIFICATION_VIBRATE);
+        mSmartCall = (SwitchPreference) findPreference(SMART_DIALER_ENABLED);
         Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         if (mVibratePref != null && (vibrator == null || !vibrator.hasVibrator())) {
             mNotificationPrefCategory.removePreference(mVibratePref);
@@ -255,6 +261,9 @@ public class MessagingPreferenceActivity extends PreferenceActivity
 
         setEnabledNotificationsPref();
 
+        // smart dialer
+        setEnabledSmartCallPref();
+
         // If needed, migrate vibration setting from the previous tri-state setting stored in
         // NOTIFICATION_VIBRATE_WHEN to the boolean setting stored in NOTIFICATION_VIBRATE.
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
@@ -280,6 +289,11 @@ public class MessagingPreferenceActivity extends PreferenceActivity
         setRingtoneSummary(soundValue);
     }
 
+    private void setEnabledSmartCallPref() {
+        boolean isSmartCallEnabled = getSmartCallEnabled(this);
+        mSmartCall.setChecked(isSmartCallEnabled);
+    }
+
     private void setRingtoneSummary(String soundValue) {
         Uri soundUri = TextUtils.isEmpty(soundValue) ? null : Uri.parse(soundValue);
         Ringtone tone = soundUri != null ? RingtoneManager.getRingtone(this, soundUri) : null;
@@ -289,7 +303,7 @@ public class MessagingPreferenceActivity extends PreferenceActivity
 
     private void setEnabledNotificationsPref() {
         // The "enable notifications" setting is really stored in our own prefs. Read the
-        // current value and set the checkbox to match.
+        // current value and set the Switch to match.
         mEnableNotificationsPref.setChecked(getNotificationEnabled(this));
     }
 
@@ -359,6 +373,8 @@ public class MessagingPreferenceActivity extends PreferenceActivity
             if (mMmsAutoRetrievialPref.isChecked()) {
                 startMmsDownload();
             }
+        } else if (preference == mSmartCall) {
+            enableSmartDialer(mSmartCall.isChecked(), this);
         }
 
         return super.onPreferenceTreeClick(preferenceScreen, preference);
@@ -426,6 +442,20 @@ public class MessagingPreferenceActivity extends PreferenceActivity
 
         editor.putBoolean(MessagingPreferenceActivity.NOTIFICATION_ENABLED, enabled);
 
+        editor.apply();
+    }
+
+    public static boolean getSmartCallEnabled(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean smartCallEnabled =
+            prefs.getBoolean(MessagingPreferenceActivity.SMART_DIALER_ENABLED, false);
+        return smartCallEnabled;
+    }
+
+    public static void enableSmartDialer(boolean enabled, Context context) {
+        SharedPreferences.Editor editor =
+            PreferenceManager.getDefaultSharedPreferences(context).edit();
+        editor.putBoolean(MessagingPreferenceActivity.SMART_DIALER_ENABLED, enabled);
         editor.apply();
     }
 
